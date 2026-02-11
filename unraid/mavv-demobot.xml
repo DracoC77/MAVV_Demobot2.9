@@ -123,6 +123,26 @@
       <Mask>false</Mask>
     </Variable>
     <Variable>
+      <Value>friday</Value>
+      <Name>ATTENDANCE_CUTOFF_DAY</Name>
+      <Mode/>
+      <Description>Day of week after which attendance changes are locked</Description>
+      <Default>friday</Default>
+      <Display>always</Display>
+      <Required>false</Required>
+      <Mask>false</Mask>
+    </Variable>
+    <Variable>
+      <Value>09:00</Value>
+      <Name>ATTENDANCE_CUTOFF_TIME</Name>
+      <Mode/>
+      <Description>Time after which attendance changes are locked (HH:MM in configured timezone)</Description>
+      <Default>09:00</Default>
+      <Display>always</Display>
+      <Required>false</Required>
+      <Mask>false</Mask>
+    </Variable>
+    <Variable>
       <Value>America/Los_Angeles</Value>
       <Name>TIMEZONE</Name>
       <Mode/>
@@ -184,4 +204,22 @@
     </Variable>
   </Environment>
   <Config Name="Data" Target="/app/data" Default="/mnt/user/appdata/mavv-demobot/data" Mode="rw" Description="Database and persistent data" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/mavv-demobot/data</Config>
+  <Config Name="Discord Token" Target="DISCORD_TOKEN" Default="" Mode="" Description="Discord bot token from https://discord.com/developers/applications" Type="Variable" Display="always-hide" Required="true" Mask="true"/>
+  <Config Name="Discord Guild ID" Target="DISCORD_GUILD_ID" Default="" Mode="" Description="Your Discord server (guild) ID" Type="Variable" Display="always" Required="true" Mask="false"/>
+  <Config Name="Vote Channel ID" Target="VOTE_CHANNEL_ID" Default="" Mode="" Description="Channel ID for voting announcements and results" Type="Variable" Display="always" Required="true" Mask="false"/>
+  <Config Name="Admin User IDs" Target="ADMIN_USER_IDS" Default="" Mode="" Description="Comma-separated Discord user IDs for bot admins" Type="Variable" Display="always" Required="true" Mask="false"/>
+  <Config Name="Vote Open Day" Target="VOTE_OPEN_DAY" Default="tuesday" Mode="" Description="Day of week to open voting" Type="Variable" Display="always" Required="false" Mask="false">tuesday</Config>
+  <Config Name="Vote Open Time" Target="VOTE_OPEN_TIME" Default="09:00" Mode="" Description="Time to open voting (HH:MM in configured timezone)" Type="Variable" Display="always" Required="false" Mask="false">09:00</Config>
+  <Config Name="Results Day" Target="RESULTS_DAY" Default="friday" Mode="" Description="Day of week to publish results" Type="Variable" Display="always" Required="false" Mask="false">friday</Config>
+  <Config Name="Results Time" Target="RESULTS_TIME" Default="09:00" Mode="" Description="Time to publish results (HH:MM in configured timezone)" Type="Variable" Display="always" Required="false" Mask="false">09:00</Config>
+  <Config Name="Reminder Day" Target="REMINDER_DAY" Default="thursday" Mode="" Description="Day of week to send reminder DMs" Type="Variable" Display="always" Required="false" Mask="false">thursday</Config>
+  <Config Name="Reminder Time" Target="REMINDER_TIME" Default="18:00" Mode="" Description="Time to send reminders (HH:MM in configured timezone)" Type="Variable" Display="always" Required="false" Mask="false">18:00</Config>
+  <Config Name="Attendance Cutoff Day" Target="ATTENDANCE_CUTOFF_DAY" Default="friday" Mode="" Description="Day of week after which attendance changes are locked" Type="Variable" Display="always" Required="false" Mask="false">friday</Config>
+  <Config Name="Attendance Cutoff Time" Target="ATTENDANCE_CUTOFF_TIME" Default="09:00" Mode="" Description="Time after which attendance changes are locked (HH:MM in configured timezone)" Type="Variable" Display="always" Required="false" Mask="false">09:00</Config>
+  <Config Name="Timezone" Target="TIMEZONE" Default="America/Los_Angeles" Mode="" Description="IANA timezone for all scheduled events" Type="Variable" Display="always" Required="false" Mask="false">America/Los_Angeles</Config>
+  <Config Name="Runoff Deadline Day" Target="RUNOFF_DEADLINE_DAY" Default="monday" Mode="" Description="Day of week when runoff voting closes (e.g. monday = before game night)" Type="Variable" Display="always" Required="false" Mask="false">monday</Config>
+  <Config Name="Runoff Deadline Time" Target="RUNOFF_DEADLINE_TIME" Default="17:00" Mode="" Description="Time when runoff voting closes (HH:MM in configured timezone)" Type="Variable" Display="always" Required="false" Mask="false">17:00</Config>
+  <Config Name="Max Nominations Per Person" Target="MAX_NOMINATIONS_PER_PERSON" Default="1" Mode="" Description="Max game nominations per person per week" Type="Variable" Display="always" Required="false" Mask="false">1</Config>
+  <Config Name="Max Total Games" Target="MAX_TOTAL_GAMES" Default="10" Mode="" Description="Max games on the ballot per week" Type="Variable" Display="always" Required="false" Mask="false">10</Config>
+  <Config Name="Carry Over Count" Target="CARRY_OVER_COUNT" Default="5" Mode="" Description="Number of top games that carry over each week" Type="Variable" Display="always" Required="false" Mask="false">5</Config>
 </Container>
