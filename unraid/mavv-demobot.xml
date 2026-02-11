@@ -123,6 +123,26 @@
       <Mask>false</Mask>
     </Variable>
     <Variable>
+      <Value>friday</Value>
+      <Name>ATTENDANCE_CUTOFF_DAY</Name>
+      <Mode/>
+      <Description>Day of week after which attendance changes are locked</Description>
+      <Default>friday</Default>
+      <Display>always</Display>
+      <Required>false</Required>
+      <Mask>false</Mask>
+    </Variable>
+    <Variable>
+      <Value>09:00</Value>
+      <Name>ATTENDANCE_CUTOFF_TIME</Name>
+      <Mode/>
+      <Description>Time after which attendance changes are locked (HH:MM in configured timezone)</Description>
+      <Default>09:00</Default>
+      <Display>always</Display>
+      <Required>false</Required>
+      <Mask>false</Mask>
+    </Variable>
+    <Variable>
       <Value>America/Los_Angeles</Value>
       <Name>TIMEZONE</Name>
       <Mode/>
