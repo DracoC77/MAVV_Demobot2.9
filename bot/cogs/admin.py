@@ -112,9 +112,11 @@ class Admin(commands.Cog):
             channel = self.bot.get_channel(config.vote_channel_id)
             full_results = db.calculate_results(cycle["id"])
             if channel:
-                await resolve_runoff(self.bot, cycle["id"], full_results, channel)
+                await resolve_runoff(
+                    self.bot, cycle["id"], full_results, channel, force=True
+                )
             await interaction.followup.send(
-                f"Cycle #{cycle['id']} runoff resolved and results published.",
+                f"Cycle #{cycle['id']} runoff force-resolved and results published.",
                 ephemeral=True,
             )
         else:

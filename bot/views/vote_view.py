@@ -286,6 +286,14 @@ class VoteNowButton(discord.ui.View):
             )
             return
 
+        if cycle["status"] == "runoff":
+            await interaction.response.send_message(
+                "Voting has moved to a **runoff**! Look for the "
+                "**Runoff Vote** message in this channel to cast your tie-breaker vote.",
+                ephemeral=True,
+            )
+            return
+
         if cycle["status"] != "open":
             await interaction.response.send_message(
                 "Voting is not currently open.", ephemeral=True

@@ -34,9 +34,18 @@ class Voting(commands.Cog):
             )
             return
 
+        if cycle["status"] == "runoff":
+            await interaction.response.send_message(
+                "This cycle is in a **runoff vote** between tied games! "
+                f"Look for the runoff message in <#{self.bot.config.vote_channel_id}> "
+                "and click a button to cast your tie-breaker vote.",
+                ephemeral=True,
+            )
+            return
+
         if cycle["status"] != "open":
             await interaction.response.send_message(
-                "Voting is not currently open. The cycle may be in a runoff or closed.",
+                "Voting is not currently open.",
                 ephemeral=True,
             )
             return
@@ -144,24 +153,39 @@ class Voting(commands.Cog):
             return
 
         votes = db.get_user_votes(cycle["id"], interaction.user.id)
-        if not votes:
+        runoff_vote = db.get_user_runoff_vote(cycle["id"], interaction.user.id)
+
+        if not votes and not runoff_vote:
             await interaction.response.send_message(
                 "You haven't voted in the current cycle yet.", ephemeral=True
             )
             return
 
-        ranking_text = "\n".join(
-            f"**{i+1}.** {v['game_name']} ({v['rank']} pts)" for i, v in enumerate(votes)
-        )
         attendance = db.get_attendance(cycle["id"], interaction.user.id)
         att_status = "Attending" if attendance else "Not attending"
+        status_label = cycle["status"].title()
+        if cycle["status"] == "runoff" and cycle["runoff_round"] and cycle["runoff_round"] > 1:
+            status_label = f"Runoff Round {cycle['runoff_round']}"
 
         embed = discord.Embed(
             title="Your Current Vote",
-            description=ranking_text,
             color=discord.Color.blue(),
         )
-        embed.set_footer(text=f"Attendance: {att_status} | Cycle #{cycle['id']}")
+
+        if votes:
+            ranking_text = "\n".join(
+                f"**{i+1}.** {v['game_name']} ({v['rank']} pts)" for i, v in enumerate(votes)
+            )
+            embed.add_field(name="Game Ranking", value=ranking_text, inline=False)
+
+        if runoff_vote:
+            embed.add_field(
+                name="Runoff Pick",
+                value=f"**{runoff_vote['game_name']}**",
+                inline=False,
+            )
+
+        embed.set_footer(text=f"Attendance: {att_status} | Cycle #{cycle['id']} ({status_label})")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 

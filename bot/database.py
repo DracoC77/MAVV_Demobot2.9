@@ -47,7 +47,9 @@ def init_db() -> None:
             closed_at TEXT,
             results_published_at TEXT,
             winning_game_id INTEGER REFERENCES games(id),
-            announcement_message_id INTEGER
+            announcement_message_id INTEGER,
+            runoff_round INTEGER NOT NULL DEFAULT 0,
+            runoff_deadline TEXT
         );
 
         CREATE TABLE IF NOT EXISTS cycle_games (
@@ -95,6 +97,13 @@ def init_db() -> None:
             display_name TEXT
         );
 
+        CREATE TABLE IF NOT EXISTS cycle_runoff_games (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cycle_id INTEGER NOT NULL REFERENCES voting_cycles(id),
+            game_id INTEGER NOT NULL REFERENCES games(id),
+            UNIQUE(cycle_id, game_id)
+        );
+
         CREATE TABLE IF NOT EXISTS pending_nominations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             game_id INTEGER NOT NULL REFERENCES games(id),
@@ -105,6 +114,20 @@ def init_db() -> None:
     """
     )
     conn.commit()
+
+    # Migrations for existing databases
+    for col, default in [("runoff_round", "0"), ("runoff_deadline", "NULL")]:
+        try:
+            if default == "NULL":
+                conn.execute(f"ALTER TABLE voting_cycles ADD COLUMN {col} TEXT")
+            else:
+                conn.execute(
+                    f"ALTER TABLE voting_cycles ADD COLUMN {col} INTEGER NOT NULL DEFAULT {default}"
+                )
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
     conn.close()
 
 
@@ -212,14 +235,19 @@ def close_cycle(cycle_id: int) -> None:
     conn.close()
 
 
-def set_cycle_runoff(cycle_id: int) -> None:
+def set_cycle_runoff(cycle_id: int) -> int:
+    """Set cycle to runoff status and increment the round counter. Returns new round number."""
     conn = get_connection()
     conn.execute(
-        "UPDATE voting_cycles SET status = 'runoff' WHERE id = ?",
+        "UPDATE voting_cycles SET status = 'runoff', runoff_round = runoff_round + 1 WHERE id = ?",
         (cycle_id,),
     )
+    row = conn.execute(
+        "SELECT runoff_round FROM voting_cycles WHERE id = ?", (cycle_id,)
+    ).fetchone()
     conn.commit()
     conn.close()
+    return row["runoff_round"]
 
 
 def publish_cycle(cycle_id: int, winning_game_id: int) -> None:
@@ -558,6 +586,73 @@ def get_runoff_results(cycle_id: int) -> list[dict]:
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+def clear_runoff_votes(cycle_id: int) -> None:
+    """Clear all runoff votes for a cycle (used when starting a re-runoff)."""
+    conn = get_connection()
+    conn.execute("DELETE FROM runoff_votes WHERE cycle_id = ?", (cycle_id,))
+    conn.commit()
+    conn.close()
+
+
+def get_runoff_round(cycle_id: int) -> int:
+    """Get the current runoff round number for a cycle (0 = no runoff yet)."""
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT runoff_round FROM voting_cycles WHERE id = ?", (cycle_id,)
+    ).fetchone()
+    conn.close()
+    return row["runoff_round"] if row else 0
+
+
+def set_runoff_games(cycle_id: int, game_ids: list[int]) -> None:
+    """Store which games are in the current runoff."""
+    conn = get_connection()
+    conn.execute("DELETE FROM cycle_runoff_games WHERE cycle_id = ?", (cycle_id,))
+    for gid in game_ids:
+        conn.execute(
+            "INSERT INTO cycle_runoff_games (cycle_id, game_id) VALUES (?, ?)",
+            (cycle_id, gid),
+        )
+    conn.commit()
+    conn.close()
+
+
+def get_runoff_games(cycle_id: int) -> list[dict]:
+    """Get the games in the current runoff."""
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT crg.game_id, g.name AS game_name FROM cycle_runoff_games crg "
+        "JOIN games g ON g.id = crg.game_id WHERE crg.cycle_id = ? ORDER BY g.name",
+        (cycle_id,),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def set_runoff_deadline(cycle_id: int, deadline_iso: str) -> None:
+    """Store the runoff deadline as an ISO datetime string."""
+    conn = get_connection()
+    conn.execute(
+        "UPDATE voting_cycles SET runoff_deadline = ? WHERE id = ?",
+        (deadline_iso, cycle_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_user_runoff_vote(cycle_id: int, user_id: int) -> Optional[dict]:
+    """Get a user's runoff vote for a cycle."""
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT rv.game_id, g.name AS game_name FROM runoff_votes rv "
+        "JOIN games g ON g.id = rv.game_id "
+        "WHERE rv.cycle_id = ? AND rv.user_id = ?",
+        (cycle_id, user_id),
+    ).fetchone()
+    conn.close()
+    return dict(row) if row else None
 
 
 # ---------------------------------------------------------------------------
