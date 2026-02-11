@@ -383,10 +383,7 @@ def build_cycle_announcement(
     )
 
     if games:
-        game_list = "\n".join(
-            f"{'(carry-over) ' if g['is_carry_over'] else ''}{g['game_name']}"
-            for g in games
-        )
+        game_list = "\n".join(f"- {g['game_name']}" for g in games)
         embed.add_field(name="Games on the Ballot", value=game_list, inline=False)
     else:
         embed.add_field(
