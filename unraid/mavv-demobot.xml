@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <Container version="2">
   <Name>mavv-demobot</Name>
-  <Repository>mavv-demobot</Repository>
-  <Registry/>
+  <Repository>ghcr.io/dracoc77/mavv_demobot2.9:latest</Repository>
+  <Registry>ghcr.io</Registry>
   <Network>bridge</Network>
   <Shell>bash</Shell>
   <Privileged>false</Privileged>
