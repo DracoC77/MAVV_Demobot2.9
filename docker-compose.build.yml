@@ -1,10 +1,11 @@
+# Use this to build the image locally instead of pulling from ghcr.io
+#   docker compose -f docker-compose.build.yml up -d
 services:
   demobot:
-    image: ghcr.io/dracoc77/mavv_demobot2.9:latest
+    build: .
     container_name: mavv-demobot
     restart: unless-stopped
     env_file:
       - .env
     volumes:
       - ./data:/app/data
-    # No ports needed — bot connects outbound to Discord

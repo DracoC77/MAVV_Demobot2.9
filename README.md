@@ -41,6 +41,10 @@ Enable Developer Mode in Discord: User Settings → Advanced → Developer Mode
 ### 3. Configure
 
 ```bash
+mkdir mavv-demobot && cd mavv-demobot
+# Download the example env and compose files
+curl -O https://raw.githubusercontent.com/DracoC77/MAVV_Demobot2.9/main/.env.example
+curl -O https://raw.githubusercontent.com/DracoC77/MAVV_Demobot2.9/main/docker-compose.yml
 cp .env.example .env
 # Edit .env with your values
 ```
@@ -51,9 +55,9 @@ cp .env.example .env
 docker compose up -d
 ```
 
-The bot will start, sync slash commands to your server, and begin the automated schedule.
+This pulls the pre-built image from `ghcr.io/dracoc77/mavv_demobot2.9:latest` and starts the bot. No local build needed.
 
-### 5. First-Time Setup
+### 5. First-Time Setup (in Discord)
 
 1. Use `/admin adduser @member` to add each member of your gaming group to the authorized voters list
 2. Run `/admin start` to open the first voting cycle
@@ -62,20 +66,52 @@ The bot will start, sync slash commands to your server, and begin the automated 
 
 After the first week, the bot handles everything automatically.
 
+### Updating
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+## Docker Image
+
+The Docker image is automatically built and pushed to GitHub Container Registry on every push to `main`.
+
+```
+ghcr.io/dracoc77/mavv_demobot2.9:latest
+```
+
+**Tags:**
+- `latest` — always the most recent `main` build
+- `v1.0.0`, `v1.0`, etc. — tagged releases (when you create a GitHub release with a `v*` tag)
+- `sha-abc1234` — specific commit builds
+
+### Building Locally (optional)
+
+If you prefer to build from source instead of pulling from ghcr.io:
+
+```bash
+git clone https://github.com/DracoC77/MAVV_Demobot2.9.git
+cd MAVV_Demobot2.9
+cp .env.example .env
+# Edit .env
+docker compose -f docker-compose.build.yml up -d
+```
+
 ## Unraid Setup
 
 ### Option A: Docker Compose (Recommended)
 
-1. Clone this repo to your Unraid server
-2. Copy `.env.example` to `.env` and fill in your values
-3. Run `docker compose up -d`
+1. Create a directory: `mkdir /mnt/user/appdata/mavv-demobot`
+2. Download `.env.example` and `docker-compose.yml` into that directory
+3. Copy `.env.example` to `.env` and fill in your values
+4. Run `docker compose up -d`
 
 ### Option B: Unraid Template
 
-1. Build the image: `docker build -t mavv-demobot .`
-2. In Unraid, go to **Docker** → **Add Container**
-3. Use the template from `unraid/mavv-demobot.xml` or manually configure:
-   - **Repository**: `mavv-demobot`
+1. In Unraid, go to **Docker** → **Add Container**
+2. Use the template from `unraid/mavv-demobot.xml` or manually configure:
+   - **Repository**: `ghcr.io/dracoc77/mavv_demobot2.9:latest`
    - **Volume**: `/mnt/user/appdata/mavv-demobot/data` → `/app/data`
    - Add all environment variables from `.env.example`
 
@@ -117,7 +153,7 @@ After the first week, the bot handles everything automatically.
    - First pick = highest score (N points), last pick = 1 point
 4. **Reminders** (Thursday 6 PM PT) — Bot DMs attending members who haven't voted
 5. **Results** (Friday 9 AM PT) — Bot calculates average scores, posts results
-   - If tied: runoff poll with single-pick among tied games (2 hours)
+   - If tied: runoff poll with single-pick among tied games, open until Monday 5 PM PT
 6. **Carry-over** — Top 5 games populate next week's ballot
 
 ## Environment Variables
@@ -134,30 +170,34 @@ See `.env.example` for the full list with descriptions. Key settings:
 | `RESULTS_DAY` / `RESULTS_TIME` | friday / 09:00 | When results publish |
 | `REMINDER_DAY` / `REMINDER_TIME` | thursday / 18:00 | When reminders go out |
 | `TIMEZONE` | America/Los_Angeles | IANA timezone for all times |
-| `RUNOFF_DURATION_MINUTES` | 120 | How long runoffs last |
+| `RUNOFF_DEADLINE_DAY` / `RUNOFF_DEADLINE_TIME` | monday / 17:00 | When runoff voting closes |
 | `MAX_TOTAL_GAMES` | 10 | Max games on ballot |
 | `CARRY_OVER_COUNT` | 5 | Games carried to next week |
 
 ## Project Structure
 
 ```
+├── .github/
+│   └── workflows/
+│       └── docker-publish.yml  # CI: build & push to ghcr.io
 ├── bot/
-│   ├── main.py          # Bot entry point
-│   ├── config.py         # Environment variable loading
-│   ├── database.py       # SQLite schema and queries
+│   ├── main.py                 # Bot entry point
+│   ├── config.py               # Environment variable loading
+│   ├── database.py             # SQLite schema and queries
 │   ├── cogs/
-│   │   ├── voting.py     # /vote, /attend, /nominate, /myvote
-│   │   ├── admin.py      # /admin commands
-│   │   ├── results.py    # /results, /status, result publishing
-│   │   └── scheduler.py  # APScheduler automated cycle
+│   │   ├── voting.py           # /vote, /attend, /nominate, /myvote
+│   │   ├── admin.py            # /admin commands (incl. user mgmt)
+│   │   ├── results.py          # /results, /status, result publishing
+│   │   └── scheduler.py        # APScheduler automated cycle
 │   └── views/
-│       ├── vote_view.py  # Interactive button ranking UI
-│       └── runoff_view.py # Runoff single-pick UI
-├── data/                  # SQLite database (Docker volume)
+│       ├── vote_view.py        # Interactive button ranking UI
+│       └── runoff_view.py      # Runoff single-pick UI
+├── data/                        # SQLite database (Docker volume)
 ├── unraid/
-│   └── mavv-demobot.xml  # Unraid container template
+│   └── mavv-demobot.xml        # Unraid container template
 ├── Dockerfile
-├── docker-compose.yml
+├── docker-compose.yml           # Pulls from ghcr.io
+├── docker-compose.build.yml     # Local build alternative
 ├── requirements.txt
 └── .env.example
 ```

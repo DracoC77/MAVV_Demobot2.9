@@ -1,6 +1,5 @@
 """Results cog — /results, /status commands, and result publishing logic."""
 
-import asyncio
 import logging
 from datetime import datetime, timedelta
 
@@ -51,6 +50,35 @@ async def publish_results(bot: commands.Bot, cycle_id: int) -> None:
         log.info(f"Cycle #{cycle_id} results published. Winner: {winner['game_name']}")
 
 
+DAY_MAP = {
+    "monday": 0,
+    "tuesday": 1,
+    "wednesday": 2,
+    "thursday": 3,
+    "friday": 4,
+    "saturday": 5,
+    "sunday": 6,
+}
+
+
+def compute_runoff_deadline(config) -> datetime:
+    """Compute the next occurrence of the runoff deadline day+time."""
+    now = datetime.now(config.tz)
+    deadline_day_num = DAY_MAP.get(config.runoff_deadline_day, 0)
+    deadline_h, deadline_m = map(int, config.runoff_deadline_time.split(":"))
+
+    days_until = (deadline_day_num - now.weekday()) % 7
+    deadline = now.replace(
+        hour=deadline_h, minute=deadline_m, second=0, microsecond=0
+    ) + timedelta(days=days_until)
+
+    # If the deadline is in the past (or right now), push to next week
+    if deadline <= now:
+        deadline += timedelta(days=7)
+
+    return deadline
+
+
 async def start_runoff(
     bot: commands.Bot,
     cycle_id: int,
@@ -58,7 +86,7 @@ async def start_runoff(
     full_results: list[dict],
     channel: discord.TextChannel,
 ) -> None:
-    """Start a runoff vote for tied games."""
+    """Start a runoff vote for tied games. Resolution is handled by the scheduler."""
     config = bot.config
     db.set_cycle_runoff(cycle_id)
 
@@ -66,12 +94,11 @@ async def start_runoff(
     view = RunoffView(cycle_id, tied_games)
     embed = view.build_embed()
 
-    duration = config.runoff_duration_minutes
-    end_time = datetime.now(config.tz) + timedelta(minutes=duration)
-    discord_ts = int(end_time.timestamp())
+    deadline = compute_runoff_deadline(config)
+    discord_ts = int(deadline.timestamp())
     embed.add_field(
-        name="Runoff Ends",
-        value=f"<t:{discord_ts}:R> (<t:{discord_ts}:f>)",
+        name="Runoff Deadline",
+        value=f"<t:{discord_ts}:F> (<t:{discord_ts}:R>)",
         inline=False,
     )
 
@@ -86,16 +113,17 @@ async def start_runoff(
             await user.send(
                 f"A **runoff vote** is needed for MAVV Game Night! "
                 f"Head to <#{config.vote_channel_id}> to cast your tie-breaker vote. "
-                f"Runoff ends <t:{discord_ts}:R>."
+                f"Runoff closes <t:{discord_ts}:F> (<t:{discord_ts}:R>)."
             )
         except Exception:
             pass
 
-    # Wait for runoff duration
-    await asyncio.sleep(duration * 60)
-
-    # Resolve runoff
-    await resolve_runoff(bot, cycle_id, full_results, channel)
+    # Schedule the runoff resolution via the scheduler cog
+    scheduler_cog = bot.get_cog("Scheduler")
+    if scheduler_cog:
+        scheduler_cog.schedule_runoff_resolution(cycle_id, deadline)
+    else:
+        log.error("Scheduler cog not found — runoff will not auto-resolve!")
 
 
 async def resolve_runoff(
