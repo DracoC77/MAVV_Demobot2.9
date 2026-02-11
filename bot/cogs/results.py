@@ -232,6 +232,9 @@ def build_results_embed(
         inline=False,
     )
 
+    # Get individual vote values per game for the histogram
+    histogram = db.get_vote_histogram(cycle_id)
+
     # Figure out the carry-over cutoff, expanding for ties at the boundary
     cutoff = min(carry_over_count, len(results))
     if cutoff > 0 and cutoff < len(results):
@@ -250,16 +253,17 @@ def build_results_embed(
             medal = "\U0001f949 "
 
         avg = r["avg_score"]
-        votes = r["vote_count"]
+        votes_list = histogram.get(r["game_id"], [])
+        votes_str = ",".join(str(v) for v in votes_list)
         ranking_lines.append(
-            f"{medal}**{i+1}.** {r['game_name']} — avg score: {avg:.2f} ({votes} votes)"
+            f"{medal}**{i+1}.** {r['game_name']} — {avg:.2f} `{votes_str}`"
         )
 
         if i == cutoff - 1 and cutoff < len(results):
-            ranking_lines.append("─── *dropping games below* ───")
+            ranking_lines.append("─── *carrying over above* ───")
 
     embed.add_field(
-        name="Full Rankings",
+        name="Results Histogram",
         value="\n".join(ranking_lines),
         inline=False,
     )

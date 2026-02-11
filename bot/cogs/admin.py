@@ -441,14 +441,7 @@ def build_cycle_announcement(
     """Build the embed for a new cycle announcement."""
     embed = discord.Embed(
         title="MAVV Game Night — New Voting Cycle!",
-        description=(
-            "A new week of voting has begun! Set your attendance and rank the games.\n\n"
-            "**How it works:**\n"
-            "1. Click **Set Attending** or use `/attend yes`\n"
-            "2. Use `/nominate <game>` to add a game (1 per person)\n"
-            "3. Click **Vote Now** or use `/vote` to rank the games\n"
-            "4. Results will be published automatically!"
-        ),
+        description="A new week of voting has begun! Set your attendance and rank the games.",
         color=discord.Color.gold(),
     )
 
@@ -462,12 +455,6 @@ def build_cycle_announcement(
             inline=False,
         )
 
-    nom_slots = config.max_total_games - len(games)
-    embed.add_field(
-        name="Nomination Slots",
-        value=f"{nom_slots} of {config.max_total_games} remaining",
-        inline=True,
-    )
     embed.set_footer(text=f"Cycle #{cycle_id}")
     return embed
 

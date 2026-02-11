@@ -509,6 +509,30 @@ def get_user_votes(cycle_id: int, user_id: int) -> list[sqlite3.Row]:
     return rows
 
 
+def get_vote_histogram(cycle_id: int) -> dict[int, list[int]]:
+    """Get individual vote scores per game (attending voters only), sorted high to low.
+
+    Returns {game_id: [score, score, ...]} with scores in descending order.
+    """
+    attending = get_attending_users(cycle_id)
+    if not attending:
+        return {}
+    conn = get_connection()
+    placeholders = ",".join("?" * len(attending))
+    rows = conn.execute(
+        f"SELECT game_id, rank FROM votes "
+        f"WHERE cycle_id = ? AND user_id IN ({placeholders}) "
+        f"ORDER BY game_id, rank DESC",
+        (cycle_id, *attending),
+    ).fetchall()
+    conn.close()
+
+    histogram: dict[int, list[int]] = {}
+    for row in rows:
+        histogram.setdefault(row["game_id"], []).append(row["rank"])
+    return histogram
+
+
 def get_voters(cycle_id: int) -> list[int]:
     """Get all user IDs that have submitted votes for a cycle."""
     conn = get_connection()
