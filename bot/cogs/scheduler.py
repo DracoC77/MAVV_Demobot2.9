@@ -102,9 +102,29 @@ class Scheduler(commands.Cog):
         if cycle and cycle["status"] == "runoff":
             from bot.cogs.results import compute_runoff_deadline
 
-            deadline = compute_runoff_deadline(config)
-            self.schedule_runoff_resolution(cycle["id"], deadline)
-            log.info(f"Resumed runoff resolution job for cycle #{cycle['id']} at {deadline}")
+            now = datetime.now(config.tz)
+
+            # Use the stored deadline if available, otherwise compute it
+            stored = cycle["runoff_deadline"]
+            if stored:
+                try:
+                    deadline = datetime.fromisoformat(stored)
+                except (ValueError, TypeError):
+                    deadline = compute_runoff_deadline(config)
+            else:
+                deadline = compute_runoff_deadline(config)
+
+            if deadline <= now:
+                # Deadline already passed while bot was down — resolve ASAP
+                resolve_at = now + timedelta(seconds=5)
+                self.schedule_runoff_resolution(cycle["id"], resolve_at)
+                log.info(
+                    f"Runoff deadline for cycle #{cycle['id']} has passed ({deadline}). "
+                    f"Resolving in 5 seconds."
+                )
+            else:
+                self.schedule_runoff_resolution(cycle["id"], deadline)
+                log.info(f"Resumed runoff resolution job for cycle #{cycle['id']} at {deadline}")
 
     def schedule_runoff_resolution(self, cycle_id: int, deadline: datetime) -> None:
         """Schedule a one-time job to resolve a runoff at the given deadline."""
@@ -128,8 +148,33 @@ class Scheduler(commands.Cog):
         # Don't open if there's already an active cycle
         existing = db.get_current_cycle()
         if existing:
-            log.info(f"Skipping auto-open: cycle #{existing['id']} is still active.")
-            return
+            if existing["status"] == "runoff":
+                # Auto-resolve the lingering runoff before starting a new cycle
+                log.info(
+                    f"Auto-resolving runoff for cycle #{existing['id']} "
+                    "before opening new cycle."
+                )
+                channel = self.bot.get_channel(config.vote_channel_id)
+                if channel:
+                    from bot.cogs.results import resolve_runoff
+
+                    full_results = db.calculate_results(existing["id"])
+                    await resolve_runoff(
+                        self.bot, existing["id"], full_results, channel, force=True
+                    )
+
+                # Check if it actually closed (resolve_runoff with force=True
+                # should always close, but be safe)
+                still_active = db.get_current_cycle()
+                if still_active:
+                    log.info(
+                        f"Cycle #{still_active['id']} still active after "
+                        "force-resolve. Skipping auto-open."
+                    )
+                    return
+            else:
+                log.info(f"Skipping auto-open: cycle #{existing['id']} is still active.")
+                return
 
         cycle_id = db.create_cycle()
 

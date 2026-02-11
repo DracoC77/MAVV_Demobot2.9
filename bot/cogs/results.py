@@ -12,6 +12,8 @@ from bot.views.runoff_view import RunoffView
 
 log = logging.getLogger("demobot.results")
 
+MAX_RUNOFF_ROUNDS = 3
+
 
 async def publish_results(bot: commands.Bot, cycle_id: int) -> None:
     """Calculate and publish results for a cycle. Handles ties with runoff."""
@@ -88,13 +90,16 @@ async def start_runoff(
 ) -> None:
     """Start a runoff vote for tied games. Resolution is handled by the scheduler."""
     config = bot.config
-    db.set_cycle_runoff(cycle_id)
+    round_num = db.set_cycle_runoff(cycle_id)
 
     tied_games = [(g["game_id"], g["game_name"]) for g in tied]
+    db.set_runoff_games(cycle_id, [g[0] for g in tied_games])
+
     view = RunoffView(cycle_id, tied_games)
-    embed = view.build_embed()
+    embed = view.build_embed(round_num)
 
     deadline = compute_runoff_deadline(config)
+    db.set_runoff_deadline(cycle_id, deadline.isoformat())
     discord_ts = int(deadline.timestamp())
     embed.add_field(
         name="Runoff Deadline",
@@ -107,14 +112,23 @@ async def start_runoff(
 
     # Notify attending members
     attending = db.get_attending_users(cycle_id)
+    if round_num > 1:
+        dm_text = (
+            f"The runoff vote tied again! A **new runoff** (round {round_num}) is needed. "
+            f"Head to <#{config.vote_channel_id}> to pick your game. "
+            f"Deadline: <t:{discord_ts}:F> (<t:{discord_ts}:R>)."
+        )
+    else:
+        dm_text = (
+            f"A **runoff vote** is needed for MAVV Game Night! "
+            f"Head to <#{config.vote_channel_id}> to cast your tie-breaker vote. "
+            f"Runoff closes <t:{discord_ts}:F> (<t:{discord_ts}:R>)."
+        )
+
     for uid in attending:
         try:
             user = await bot.fetch_user(uid)
-            await user.send(
-                f"A **runoff vote** is needed for MAVV Game Night! "
-                f"Head to <#{config.vote_channel_id}> to cast your tie-breaker vote. "
-                f"Runoff closes <t:{discord_ts}:F> (<t:{discord_ts}:R>)."
-            )
+            await user.send(dm_text)
         except Exception:
             pass
 
@@ -131,8 +145,15 @@ async def resolve_runoff(
     cycle_id: int,
     full_results: list[dict],
     channel: discord.TextChannel,
+    *,
+    force: bool = False,
 ) -> None:
-    """Count runoff votes and publish final results."""
+    """Count runoff votes and publish final results.
+
+    If the runoff itself ties and we haven't exceeded MAX_RUNOFF_ROUNDS,
+    a new runoff round is started automatically (unless *force* is True,
+    which always picks a winner immediately).
+    """
     runoff_results = db.get_runoff_results(cycle_id)
 
     if not runoff_results:
@@ -147,9 +168,26 @@ async def resolve_runoff(
         runoff_tied = [r for r in runoff_results if r["vote_count"] == max_votes]
 
         if len(runoff_tied) > 1:
-            # Still tied — pick alphabetically
+            round_num = db.get_runoff_round(cycle_id)
+            if not force and round_num < MAX_RUNOFF_ROUNDS:
+                # Start another runoff with the still-tied subset
+                log.info(
+                    f"Runoff for cycle #{cycle_id} tied after round {round_num}. "
+                    f"Starting round {round_num + 1}."
+                )
+                db.clear_runoff_votes(cycle_id)
+                await start_runoff(bot, cycle_id, runoff_tied, full_results, channel)
+                return  # New runoff started — don't publish yet
+
+            # Max rounds exceeded or force — pick alphabetically
             winner_row = min(runoff_tied, key=lambda g: g["game_name"])
-            note = "Runoff also tied! Winner chosen alphabetically."
+            if force:
+                note = "Runoff force-closed by admin. Winner chosen alphabetically from tied games."
+            else:
+                note = (
+                    f"Runoff still tied after {round_num} rounds. "
+                    "Winner chosen alphabetically."
+                )
         else:
             winner_row = runoff_results[0]
             note = None
@@ -194,12 +232,23 @@ def build_results_embed(
         inline=False,
     )
 
+    # Get individual vote values per game for the histogram
+    histogram = db.get_vote_histogram(cycle_id)
+
     # Figure out the carry-over cutoff, expanding for ties at the boundary
     cutoff = min(carry_over_count, len(results))
     if cutoff > 0 and cutoff < len(results):
         boundary_score = results[cutoff - 1]["avg_score"]
         while cutoff < len(results) and abs(results[cutoff]["avg_score"] - boundary_score) < 0.0001:
             cutoff += 1
+
+    # Pre-compute vote strings and pad width for inline-code alignment
+    votes_strs: dict[int, str] = {}
+    for r in results:
+        votes_list = histogram.get(r["game_id"], [])
+        votes_strs[r["game_id"]] = ",".join(str(v) for v in votes_list)
+
+    max_votes_len = max((len(vs) for vs in votes_strs.values()), default=0)
 
     ranking_lines = []
     for i, r in enumerate(results):
@@ -212,16 +261,18 @@ def build_results_embed(
             medal = "\U0001f949 "
 
         avg = r["avg_score"]
-        votes = r["vote_count"]
+        vs = votes_strs.get(r["game_id"], "")
+        # Game name next to rank, histogram data on the right
+        padded = f"{avg:.2f}  {vs:<{max_votes_len}}"
         ranking_lines.append(
-            f"{medal}**{i+1}.** {r['game_name']} — avg score: {avg:.2f} ({votes} votes)"
+            f"{medal}**{i + 1}.** {r['game_name']} — `{padded}`"
         )
 
         if i == cutoff - 1 and cutoff < len(results):
-            ranking_lines.append("─── *dropping games below* ───")
+            ranking_lines.append("─── *carrying over above* ───")
 
     embed.add_field(
-        name="Full Rankings",
+        name="Results Histogram",
         value="\n".join(ranking_lines),
         inline=False,
     )
@@ -286,34 +337,73 @@ class Results(commands.Cog):
                 )
             return
 
-        games = db.get_cycle_games(cycle["id"])
         attending = db.get_attending_users(cycle["id"])
-        voters = db.get_voters(cycle["id"])
         all_attendance = db.get_all_attendance(cycle["id"])
-
-        embed = discord.Embed(
-            title=f"Voting Cycle #{cycle['id']} — {cycle['status'].title()}",
-            color=discord.Color.blue(),
-        )
-
-        if games:
-            game_list = "\n".join(f"- {g['game_name']}" for g in games)
-            embed.add_field(name=f"Games ({len(games)})", value=game_list, inline=False)
-
         att_yes = [a for a in all_attendance if a["attending"]]
         att_no = [a for a in all_attendance if not a["attending"]]
-        embed.add_field(
-            name="Attendance",
-            value=f"Attending: {len(att_yes)} | Not attending: {len(att_no)}",
-            inline=True,
-        )
 
-        non_voters = [uid for uid in attending if uid not in voters]
-        embed.add_field(
-            name="Votes",
-            value=f"Submitted: {len(voters)} | Waiting on: {len(non_voters)}",
-            inline=True,
-        )
+        if cycle["status"] == "runoff":
+            round_num = cycle["runoff_round"] or 1
+            title = f"Voting Cycle #{cycle['id']} — Runoff"
+            if round_num > 1:
+                title += f" (Round {round_num})"
+
+            embed = discord.Embed(title=title, color=discord.Color.orange())
+
+            runoff_games = db.get_runoff_games(cycle["id"])
+            if runoff_games:
+                game_list = "\n".join(f"- {g['game_name']}" for g in runoff_games)
+                embed.add_field(name="Tied Games", value=game_list, inline=False)
+
+            runoff_voters = set(db.get_runoff_voters(cycle["id"]))
+            non_voters = [uid for uid in attending if uid not in runoff_voters]
+            embed.add_field(
+                name="Runoff Votes",
+                value=f"Voted: {len(runoff_voters)} | Waiting on: {len(non_voters)}",
+                inline=True,
+            )
+
+            embed.add_field(
+                name="Attendance",
+                value=f"Attending: {len(att_yes)} | Not attending: {len(att_no)}",
+                inline=True,
+            )
+
+            if cycle["runoff_deadline"]:
+                try:
+                    deadline = datetime.fromisoformat(cycle["runoff_deadline"])
+                    discord_ts = int(deadline.timestamp())
+                    embed.add_field(
+                        name="Deadline",
+                        value=f"<t:{discord_ts}:F> (<t:{discord_ts}:R>)",
+                        inline=False,
+                    )
+                except (ValueError, TypeError):
+                    pass
+        else:
+            embed = discord.Embed(
+                title=f"Voting Cycle #{cycle['id']} — {cycle['status'].title()}",
+                color=discord.Color.blue(),
+            )
+
+            games = db.get_cycle_games(cycle["id"])
+            if games:
+                game_list = "\n".join(f"- {g['game_name']}" for g in games)
+                embed.add_field(name=f"Games ({len(games)})", value=game_list, inline=False)
+
+            embed.add_field(
+                name="Attendance",
+                value=f"Attending: {len(att_yes)} | Not attending: {len(att_no)}",
+                inline=True,
+            )
+
+            voters = db.get_voters(cycle["id"])
+            non_voters = [uid for uid in attending if uid not in voters]
+            embed.add_field(
+                name="Votes",
+                value=f"Submitted: {len(voters)} | Waiting on: {len(non_voters)}",
+                inline=True,
+            )
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
 

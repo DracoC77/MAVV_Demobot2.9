@@ -87,15 +87,28 @@ class RunoffView(discord.ui.View):
             row = i // 5
             self.add_item(RunoffButton(game_id, game_name, row=row))
 
-    def build_embed(self) -> discord.Embed:
+    def build_embed(self, round_num: int = 1) -> discord.Embed:
         game_list = "\n".join(f"- **{name}**" for _, name in self.tied_games)
-        embed = discord.Embed(
-            title="Runoff Vote Required!",
-            description=(
+
+        if round_num > 1:
+            title = f"Runoff Vote — Round {round_num}"
+            description = (
+                f"The previous runoff ended in a tie! Another round is needed.\n\n"
+                f"Pick **one** game:\n\n"
+                f"{game_list}\n\n"
+                "Click a button below to cast your vote."
+            )
+        else:
+            title = "Runoff Vote Required!"
+            description = (
                 "The following games are tied! Attending members: pick **one** game.\n\n"
                 f"{game_list}\n\n"
                 "Click a button below to cast your runoff vote."
-            ),
+            )
+
+        embed = discord.Embed(
+            title=title,
+            description=description,
             color=discord.Color.orange(),
         )
         embed.set_footer(text="You can change your pick by clicking a different button.")
