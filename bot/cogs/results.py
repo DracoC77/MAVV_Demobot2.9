@@ -242,29 +242,37 @@ def build_results_embed(
         while cutoff < len(results) and abs(results[cutoff]["avg_score"] - boundary_score) < 0.0001:
             cutoff += 1
 
-    ranking_lines = []
-    for i, r in enumerate(results):
-        medal = ""
-        if i == 0:
-            medal = "\U0001f947 "
-        elif i == 1:
-            medal = "\U0001f948 "
-        elif i == 2:
-            medal = "\U0001f949 "
-
-        avg = r["avg_score"]
+    # Pre-compute vote strings and column widths for alignment
+    votes_strs: dict[int, str] = {}
+    for r in results:
         votes_list = histogram.get(r["game_id"], [])
-        votes_str = ",".join(str(v) for v in votes_list)
-        ranking_lines.append(
-            f"{medal}**{i+1}.** {r['game_name']} — {avg:.2f} `{votes_str}`"
-        )
+        votes_strs[r["game_id"]] = ",".join(str(v) for v in votes_list)
 
+    votes_col = max((len(vs) for vs in votes_strs.values()), default=5)
+    votes_col = max(votes_col, 5)  # at least as wide as "Votes"
+    name_col = max((len(r["game_name"]) for r in results), default=4)
+    name_col = max(name_col, 4)  # at least as wide as "Game"
+
+    # Build aligned monospace table
+    header = f" {'#':<4} {'Avg':>5}   {'Votes':<{votes_col}}   Game"
+    separator = f" {'---':<4} {'-----':>5}   {'-' * votes_col}   {'-' * min(name_col, 20)}"
+    rows = [header, separator]
+
+    for i, r in enumerate(results):
+        avg = r["avg_score"]
+        vs = votes_strs.get(r["game_id"], "")
+        rank_str = f"{i + 1}."
+        rows.append(
+            f" {rank_str:<4} {avg:>5.2f}   {vs:<{votes_col}}   {r['game_name']}"
+        )
         if i == cutoff - 1 and cutoff < len(results):
-            ranking_lines.append("─── *carrying over above* ───")
+            rows.append(f" {'--- carrying over above ---'}")
+
+    table_text = "```\n" + "\n".join(rows) + "\n```"
 
     embed.add_field(
         name="Results Histogram",
-        value="\n".join(ranking_lines),
+        value=table_text,
         inline=False,
     )
 
