@@ -225,23 +225,34 @@ class Scheduler(commands.Cog):
         log.info("Scheduled: sending vote reminders.")
         config = self.bot.config
         cycle = db.get_current_cycle()
-        if not cycle or cycle["status"] != "open":
-            log.info("No open cycle for reminders.")
+        if not cycle or cycle["status"] not in ("open", "runoff"):
+            log.info("No active cycle for reminders.")
             return
 
         attending = db.get_attending_users(cycle["id"])
-        voters = db.get_voters(cycle["id"])
-        non_voters = [uid for uid in attending if uid not in voters]
+
+        if cycle["status"] == "runoff":
+            runoff_voters = set(db.get_runoff_voters(cycle["id"]))
+            non_voters = [uid for uid in attending if uid not in runoff_voters]
+            dm_text = (
+                f"Hey! There's a **runoff vote** for MAVV Game Night. "
+                f"Head to <#{config.vote_channel_id}> to cast your tie-breaker vote "
+                f"before the deadline!"
+            )
+        else:
+            voters = db.get_voters(cycle["id"])
+            non_voters = [uid for uid in attending if uid not in voters]
+            dm_text = (
+                f"Hey! Friendly reminder that you haven't submitted your MAVV Game Night "
+                f"vote yet. Head to <#{config.vote_channel_id}> and click **Vote Now** "
+                f"or use `/vote` to rank this week's games before results drop!"
+            )
 
         sent = 0
         for uid in non_voters:
             try:
                 user = await self.bot.fetch_user(uid)
-                await user.send(
-                    f"Hey! Friendly reminder that you haven't submitted your MAVV Game Night "
-                    f"vote yet. Head to <#{config.vote_channel_id}> and click **Vote Now** "
-                    f"or use `/vote` to rank this week's games before results drop!"
-                )
+                await user.send(dm_text)
                 sent += 1
             except Exception as e:
                 log.warning(f"Failed to DM user {uid}: {e}")

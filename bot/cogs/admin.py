@@ -40,8 +40,11 @@ class Admin(commands.Cog):
     async def start_cycle(self, interaction: discord.Interaction) -> None:
         existing = db.get_current_cycle()
         if existing:
+            status_hint = ""
+            if existing["status"] == "runoff":
+                status_hint = " (it's currently in a runoff)"
             await interaction.response.send_message(
-                f"There's already an active cycle (#{existing['id']}). "
+                f"There's already an active cycle (#{existing['id']}){status_hint}. "
                 "Close it first with `/admin close`.",
                 ephemeral=True,
             )
@@ -319,28 +322,40 @@ class Admin(commands.Cog):
     @is_admin()
     async def send_reminder(self, interaction: discord.Interaction) -> None:
         cycle = db.get_current_cycle()
-        if not cycle or cycle["status"] != "open":
+        if not cycle:
             await interaction.response.send_message(
-                "No open voting cycle.", ephemeral=True
+                "No active voting cycle.", ephemeral=True
             )
             return
 
         await interaction.response.defer(ephemeral=True)
 
         attending = db.get_attending_users(cycle["id"])
-        voters = db.get_voters(cycle["id"])
-        non_voters = [uid for uid in attending if uid not in voters]
+
+        if cycle["status"] == "runoff":
+            # Remind attending members who haven't voted in the runoff
+            runoff_voters = set(db.get_runoff_voters(cycle["id"]))
+            non_voters = [uid for uid in attending if uid not in runoff_voters]
+            dm_text = (
+                f"Reminder: There's a **runoff vote** for game night! "
+                f"Head to <#{self.bot.config.vote_channel_id}> to cast your "
+                f"tie-breaker vote before the deadline."
+            )
+        else:
+            voters = db.get_voters(cycle["id"])
+            non_voters = [uid for uid in attending if uid not in voters]
+            dm_text = (
+                f"Reminder: You haven't submitted your game night vote yet! "
+                f"Head to <#{self.bot.config.vote_channel_id}> and use `/vote` "
+                f"or click **Vote Now** to rank this week's games."
+            )
 
         sent = 0
         failed = 0
         for uid in non_voters:
             try:
                 user = await self.bot.fetch_user(uid)
-                await user.send(
-                    f"Reminder: You haven't submitted your game night vote yet! "
-                    f"Head to <#{self.bot.config.vote_channel_id}> and use `/vote` "
-                    f"or click **Vote Now** to rank this week's games."
-                )
+                await user.send(dm_text)
                 sent += 1
             except Exception:
                 failed += 1
