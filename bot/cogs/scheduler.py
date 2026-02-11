@@ -146,6 +146,12 @@ class Scheduler(commands.Cog):
             for game in top_games:
                 db.add_game_to_cycle(cycle_id, game["game_id"], is_carry_over=True)
 
+        # Absorb pending nominations into this cycle
+        carry_count = db.get_cycle_game_count(cycle_id)
+        nom_slots = max(0, config.max_total_games - carry_count)
+        absorbed = db.absorb_pending_nominations(cycle_id, nom_slots)
+        log.info(f"Absorbed {absorbed} pending nominations into cycle #{cycle_id}.")
+
         # Post announcement
         channel = self.bot.get_channel(config.vote_channel_id)
         if not channel:

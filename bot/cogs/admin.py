@@ -67,6 +67,10 @@ class Admin(commands.Cog):
                 db.add_game_to_cycle(cycle_id, game["game_id"], is_carry_over=True)
                 carried += 1
 
+        # Absorb pending nominations into this cycle
+        nom_slots = max(0, config.max_total_games - carried)
+        nominated = db.absorb_pending_nominations(cycle_id, nom_slots)
+
         # Post announcement
         channel = self.bot.get_channel(config.vote_channel_id)
         games = db.get_cycle_games(cycle_id)
@@ -78,7 +82,8 @@ class Admin(commands.Cog):
             db.set_cycle_announcement_message(cycle_id, msg.id)
 
         await interaction.response.send_message(
-            f"Voting cycle #{cycle_id} started! {carried} games carried over. "
+            f"Voting cycle #{cycle_id} started! {carried} games carried over, "
+            f"{nominated} nominations added. "
             f"Announcement posted in <#{config.vote_channel_id}>.",
             ephemeral=True,
         )
@@ -97,14 +102,26 @@ class Admin(commands.Cog):
 
         await interaction.response.defer(ephemeral=True)
 
-        from bot.cogs.results import publish_results
+        if cycle["status"] == "runoff":
+            from bot.cogs.results import resolve_runoff
 
-        await publish_results(self.bot, cycle["id"])
+            config = self.bot.config
+            channel = self.bot.get_channel(config.vote_channel_id)
+            full_results = db.calculate_results(cycle["id"])
+            if channel:
+                await resolve_runoff(self.bot, cycle["id"], full_results, channel)
+            await interaction.followup.send(
+                f"Cycle #{cycle['id']} runoff resolved and results published.",
+                ephemeral=True,
+            )
+        else:
+            from bot.cogs.results import publish_results
 
-        await interaction.followup.send(
-            f"Cycle #{cycle['id']} has been closed and results published.",
-            ephemeral=True,
-        )
+            await publish_results(self.bot, cycle["id"])
+            await interaction.followup.send(
+                f"Cycle #{cycle['id']} has been closed and results published.",
+                ephemeral=True,
+            )
 
     @admin_group.command(name="addgame", description="Add a game to the current ballot")
     @app_commands.describe(name="Name of the game to add")

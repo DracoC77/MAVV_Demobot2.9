@@ -83,7 +83,7 @@ class Voting(commands.Cog):
         await interaction.response.send_message(msg, ephemeral=True)
 
     @app_commands.command(
-        name="nominate", description="Nominate a game for this week's ballot"
+        name="nominate", description="Nominate a game for next week's ballot"
     )
     @app_commands.describe(game="Name of the game you want to nominate")
     async def nominate(self, interaction: discord.Interaction, game: str) -> None:
@@ -92,35 +92,14 @@ class Voting(commands.Cog):
             return
 
         config = self.bot.config
-        cycle = db.get_current_cycle()
-        if not cycle:
-            await interaction.response.send_message(
-                "There's no active voting cycle right now.", ephemeral=True
-            )
-            return
 
-        if cycle["status"] != "open":
-            await interaction.response.send_message(
-                "Nominations are closed for this cycle.", ephemeral=True
-            )
-            return
-
-        # Check total game count
-        total = db.get_cycle_game_count(cycle["id"])
-        if total >= config.max_total_games:
-            await interaction.response.send_message(
-                f"The ballot is full ({config.max_total_games} games max). "
-                "No more nominations this week.",
-                ephemeral=True,
-            )
-            return
-
-        # Check user's nomination count
-        user_noms = db.get_user_nomination_count(cycle["id"], interaction.user.id)
+        # Check user's pending nomination count
+        user_noms = db.get_pending_nomination_count_for_user(interaction.user.id)
         if user_noms >= config.max_nominations_per_person:
             await interaction.response.send_message(
-                f"You've already used your nomination for this week "
-                f"({config.max_nominations_per_person} per person).",
+                f"You've already used your nomination "
+                f"({config.max_nominations_per_person} per person). "
+                "Your slot resets when the next voting cycle opens.",
                 ephemeral=True,
             )
             return
@@ -133,13 +112,11 @@ class Voting(commands.Cog):
             return
 
         game_id = db.get_or_create_game(game_name, added_by=interaction.user.id)
-        added = db.add_game_to_cycle(
-            cycle["id"], game_id, is_carry_over=False, nominated_by=interaction.user.id
-        )
+        added = db.add_pending_nomination(game_id, nominated_by=interaction.user.id)
 
         if not added:
             await interaction.response.send_message(
-                f"**{game_name}** is already on this week's ballot.", ephemeral=True
+                f"**{game_name}** has already been nominated.", ephemeral=True
             )
             return
 
@@ -147,11 +124,12 @@ class Voting(commands.Cog):
         channel = self.bot.get_channel(config.vote_channel_id)
         if channel:
             await channel.send(
-                f"**{interaction.user.display_name}** nominated **{game_name}** for this week!"
+                f"**{interaction.user.display_name}** nominated **{game_name}** for next week!"
             )
 
         await interaction.response.send_message(
-            f"**{game_name}** has been added to this week's ballot!", ephemeral=True
+            f"**{game_name}** has been nominated and will appear on next week's ballot!",
+            ephemeral=True,
         )
 
     @app_commands.command(name="myvote", description="See your current vote for this week")
