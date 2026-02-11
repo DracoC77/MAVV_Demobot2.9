@@ -11,6 +11,8 @@ from bot.views.vote_view import VoteNowButton
 
 log = logging.getLogger("demobot.admin")
 
+MAX_GAME_NAME_LENGTH = 100
+
 
 def is_admin():
     """Check decorator: only configured admin user IDs can use the command."""
@@ -140,6 +142,13 @@ class Admin(commands.Cog):
             return
 
         game_name = name.strip()
+        if len(game_name) > MAX_GAME_NAME_LENGTH:
+            await interaction.response.send_message(
+                f"Game name is too long (max {MAX_GAME_NAME_LENGTH} characters).",
+                ephemeral=True,
+            )
+            return
+
         game_id = db.get_or_create_game(game_name, added_by=interaction.user.id)
         added = db.add_game_to_cycle(cycle["id"], game_id, is_carry_over=False)
 
@@ -234,6 +243,15 @@ class Admin(commands.Cog):
         if not game_names:
             await interaction.response.send_message(
                 "Provide at least one game name.", ephemeral=True
+            )
+            return
+
+        too_long = [n for n in game_names if len(n) > MAX_GAME_NAME_LENGTH]
+        if too_long:
+            await interaction.response.send_message(
+                f"These game names exceed {MAX_GAME_NAME_LENGTH} characters: "
+                + ", ".join(f"**{n[:30]}…**" for n in too_long),
+                ephemeral=True,
             )
             return
 
