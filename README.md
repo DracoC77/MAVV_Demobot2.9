@@ -153,7 +153,7 @@ docker compose -f docker-compose.build.yml up -d
    - First pick = highest score (N points), last pick = 1 point
 4. **Reminders** (Thursday 6 PM PT) — Bot DMs attending members who haven't voted
 5. **Results** (Friday 9 AM PT) — Bot calculates average scores, posts results
-   - If tied: runoff poll with single-pick among tied games (2 hours)
+   - If tied: runoff poll with single-pick among tied games, open until Monday 5 PM PT
 6. **Carry-over** — Top 5 games populate next week's ballot
 
 ## Environment Variables
@@ -170,7 +170,7 @@ See `.env.example` for the full list with descriptions. Key settings:
 | `RESULTS_DAY` / `RESULTS_TIME` | friday / 09:00 | When results publish |
 | `REMINDER_DAY` / `REMINDER_TIME` | thursday / 18:00 | When reminders go out |
 | `TIMEZONE` | America/Los_Angeles | IANA timezone for all times |
-| `RUNOFF_DURATION_MINUTES` | 120 | How long runoffs last |
+| `RUNOFF_DEADLINE_DAY` / `RUNOFF_DEADLINE_TIME` | monday / 17:00 | When runoff voting closes |
 | `MAX_TOTAL_GAMES` | 10 | Max games on ballot |
 | `CARRY_OVER_COUNT` | 5 | Games carried to next week |
 

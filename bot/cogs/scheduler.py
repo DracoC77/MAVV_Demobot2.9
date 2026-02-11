@@ -8,6 +8,8 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from discord.ext import commands
 
+from apscheduler.triggers.date import DateTrigger
+
 from bot import database as db
 from bot.cogs.admin import build_cycle_announcement
 from bot.cogs.results import publish_results
@@ -89,9 +91,31 @@ class Scheduler(commands.Cog):
             f"Scheduler started. "
             f"Open: {config.vote_open_day} {config.vote_open_time}, "
             f"Results: {config.results_day} {config.results_time}, "
-            f"Reminders: {config.reminder_day} {config.reminder_time} "
+            f"Reminders: {config.reminder_day} {config.reminder_time}, "
+            f"Runoff deadline: {config.runoff_deadline_day} {config.runoff_deadline_time} "
             f"(tz={config.timezone})"
         )
+
+        # Check if there's an active runoff that needs a resolution job
+        # (e.g. bot restarted mid-runoff)
+        cycle = db.get_current_cycle()
+        if cycle and cycle["status"] == "runoff":
+            from bot.cogs.results import compute_runoff_deadline
+
+            deadline = compute_runoff_deadline(config)
+            self.schedule_runoff_resolution(cycle["id"], deadline)
+            log.info(f"Resumed runoff resolution job for cycle #{cycle['id']} at {deadline}")
+
+    def schedule_runoff_resolution(self, cycle_id: int, deadline: datetime) -> None:
+        """Schedule a one-time job to resolve a runoff at the given deadline."""
+        self.scheduler.add_job(
+            self.resolve_runoff,
+            DateTrigger(run_date=deadline),
+            id=f"resolve_runoff_{cycle_id}",
+            replace_existing=True,
+            kwargs={"cycle_id": cycle_id},
+        )
+        log.info(f"Runoff resolution for cycle #{cycle_id} scheduled at {deadline}")
 
     async def cog_unload(self) -> None:
         self.scheduler.shutdown(wait=False)
@@ -165,10 +189,30 @@ class Scheduler(commands.Cog):
             return
 
         if cycle["status"] == "runoff":
-            log.info("Cycle is in runoff — will be resolved by runoff timer.")
+            log.info("Cycle is in runoff — will be resolved at runoff deadline.")
             return
 
         await publish_results(self.bot, cycle["id"])
+
+    async def resolve_runoff(self, cycle_id: int) -> None:
+        """Resolve a runoff at the scheduled deadline."""
+        log.info(f"Scheduled: resolving runoff for cycle #{cycle_id}.")
+        from bot.cogs.results import resolve_runoff
+
+        cycle = db.get_current_cycle()
+        if not cycle or cycle["id"] != cycle_id or cycle["status"] != "runoff":
+            log.info(f"Cycle #{cycle_id} is no longer in runoff. Skipping.")
+            return
+
+        config = self.bot.config
+        channel = self.bot.get_channel(config.vote_channel_id)
+        if not channel:
+            log.error(f"Vote channel {config.vote_channel_id} not found!")
+            return
+
+        # Recalculate full results to pass to resolve_runoff
+        full_results = db.calculate_results(cycle_id)
+        await resolve_runoff(self.bot, cycle_id, full_results, channel)
 
     async def send_reminders(self) -> None:
         """Send DM reminders to attending members who haven't voted."""

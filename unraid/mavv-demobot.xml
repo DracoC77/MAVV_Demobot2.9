@@ -133,11 +133,21 @@
       <Mask>false</Mask>
     </Variable>
     <Variable>
-      <Value>120</Value>
-      <Name>RUNOFF_DURATION_MINUTES</Name>
+      <Value>monday</Value>
+      <Name>RUNOFF_DEADLINE_DAY</Name>
       <Mode/>
-      <Description>Duration of runoff vote in minutes</Description>
-      <Default>120</Default>
+      <Description>Day of week when runoff voting closes (e.g. monday = before game night)</Description>
+      <Default>monday</Default>
+      <Display>always</Display>
+      <Required>false</Required>
+      <Mask>false</Mask>
+    </Variable>
+    <Variable>
+      <Value>17:00</Value>
+      <Name>RUNOFF_DEADLINE_TIME</Name>
+      <Mode/>
+      <Description>Time when runoff voting closes (HH:MM in configured timezone)</Description>
+      <Default>17:00</Default>
       <Display>always</Display>
       <Required>false</Required>
       <Mask>false</Mask>

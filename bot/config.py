@@ -23,8 +23,9 @@ class Config:
     attendance_cutoff_day: str = "friday"
     attendance_cutoff_time: str = "09:00"
 
-    # Runoff
-    runoff_duration_minutes: int = 120
+    # Runoff deadline (day + time — runoff stays open until this point)
+    runoff_deadline_day: str = "monday"
+    runoff_deadline_time: str = "17:00"
 
     # Timezone
     timezone: str = "America/Los_Angeles"
@@ -56,7 +57,8 @@ class Config:
             reminder_time=os.environ.get("REMINDER_TIME", "18:00"),
             attendance_cutoff_day=os.environ.get("ATTENDANCE_CUTOFF_DAY", "friday").lower(),
             attendance_cutoff_time=os.environ.get("ATTENDANCE_CUTOFF_TIME", "09:00"),
-            runoff_duration_minutes=int(os.environ.get("RUNOFF_DURATION_MINUTES", 120)),
+            runoff_deadline_day=os.environ.get("RUNOFF_DEADLINE_DAY", "monday").lower(),
+            runoff_deadline_time=os.environ.get("RUNOFF_DEADLINE_TIME", "17:00"),
             timezone=os.environ.get("TIMEZONE", "America/Los_Angeles"),
             max_nominations_per_person=int(os.environ.get("MAX_NOMINATIONS_PER_PERSON", 1)),
             max_total_games=int(os.environ.get("MAX_TOTAL_GAMES", 10)),
