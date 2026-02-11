@@ -37,11 +37,13 @@ class RunoffButton(discord.ui.Button["RunoffView"]):
             )
             return
 
-        # Check attendance
+        # Auto-mark attending if authorized user has no attendance record
         attendance = db.get_attendance(cycle["id"], interaction.user.id)
-        if not attendance:
+        if attendance is None:
+            db.set_attendance(cycle["id"], interaction.user.id, True)
+        elif not attendance:
             await interaction.response.send_message(
-                "Only attending members can vote in the runoff.", ephemeral=True
+                "You marked yourself as not attending this cycle.", ephemeral=True
             )
             return
 

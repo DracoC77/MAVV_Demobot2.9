@@ -7,8 +7,10 @@ import discord
 from discord.ext import commands
 
 from bot.config import Config
+from bot import database as db
 from bot.database import init_db
 from bot.views.vote_view import VoteNowButton
+from bot.views.runoff_view import RunoffView
 
 log = logging.getLogger("demobot")
 
@@ -30,6 +32,17 @@ class Demobot(commands.Bot):
     async def setup_hook(self) -> None:
         # Register persistent views (survive bot restarts)
         self.add_view(VoteNowButton())
+
+        # Re-register runoff view if a cycle is currently in runoff
+        cycle = db.get_current_cycle()
+        if cycle and cycle["status"] == "runoff":
+            results = db.calculate_results(cycle["id"])
+            if results:
+                top_score = results[0]["avg_score"]
+                tied = [r for r in results if abs(r["avg_score"] - top_score) < 0.0001]
+                if len(tied) > 1:
+                    tied_games = [(g["game_id"], g["game_name"]) for g in tied]
+                    self.add_view(RunoffView(cycle["id"], tied_games))
 
         # Load cogs
         await self.load_extension("bot.cogs.voting")
