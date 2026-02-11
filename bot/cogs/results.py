@@ -262,10 +262,10 @@ def build_results_embed(
 
         avg = r["avg_score"]
         vs = votes_strs.get(r["game_id"], "")
-        # Pad votes inside backticks so game names align
+        # Game name next to rank, histogram data on the right
         padded = f"{avg:.2f}  {vs:<{max_votes_len}}"
         ranking_lines.append(
-            f"{medal}**{i + 1}.** `{padded}` {r['game_name']}"
+            f"{medal}**{i + 1}.** {r['game_name']} — `{padded}`"
         )
 
         if i == cutoff - 1 and cutoff < len(results):
