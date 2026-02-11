@@ -374,6 +374,64 @@ class Admin(commands.Cog):
             f"Reminders sent to {sent} members. {failed} failed.", ephemeral=True
         )
 
+    @admin_group.command(
+        name="whovoted", description="See who has and hasn't voted this cycle"
+    )
+    @is_admin()
+    async def who_voted(self, interaction: discord.Interaction) -> None:
+        cycle = db.get_current_cycle()
+        if not cycle:
+            await interaction.response.send_message(
+                "No active voting cycle.", ephemeral=True
+            )
+            return
+
+        all_users = {u["user_id"]: u["display_name"] or f"User {u['user_id']}" for u in db.get_authorized_users()}
+        all_attendance = {a["user_id"]: a["attending"] for a in db.get_all_attendance(cycle["id"])}
+
+        if cycle["status"] == "runoff":
+            voter_ids = set(db.get_runoff_voters(cycle["id"]))
+            title = f"Runoff Vote Status — Cycle #{cycle['id']}"
+        else:
+            voter_ids = set(db.get_voters(cycle["id"]))
+            title = f"Vote Status — Cycle #{cycle['id']}"
+
+        voted = []
+        not_voted = []
+        declined = []
+
+        for uid, name in all_users.items():
+            att = all_attendance.get(uid)
+            if att is not None and not att:
+                declined.append(name)
+            elif uid in voter_ids:
+                voted.append(name)
+            else:
+                not_voted.append(name)
+
+        embed = discord.Embed(title=title, color=discord.Color.blue())
+
+        if voted:
+            embed.add_field(
+                name=f"Voted ({len(voted)})",
+                value="\n".join(f"- {n}" for n in sorted(voted)),
+                inline=True,
+            )
+        if not_voted:
+            embed.add_field(
+                name=f"Waiting on ({len(not_voted)})",
+                value="\n".join(f"- {n}" for n in sorted(not_voted)),
+                inline=True,
+            )
+        if declined:
+            embed.add_field(
+                name=f"Not attending ({len(declined)})",
+                value="\n".join(f"- {n}" for n in sorted(declined)),
+                inline=True,
+            )
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
 
 def build_cycle_announcement(
     cycle_id: int, games: list, config
