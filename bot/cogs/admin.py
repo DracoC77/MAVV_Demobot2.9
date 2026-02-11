@@ -235,6 +235,68 @@ class Admin(commands.Cog):
             )
 
     @admin_group.command(
+        name="adduser", description="Add a user to the authorized voters list"
+    )
+    @app_commands.describe(user="The Discord user to authorize")
+    @is_admin()
+    async def add_user(self, interaction: discord.Interaction, user: discord.User) -> None:
+        added = db.add_authorized_user(user.id, interaction.user.id, user.display_name)
+        if added:
+            await interaction.response.send_message(
+                f"**{user.display_name}** has been added to the authorized voters list.",
+                ephemeral=True,
+            )
+        else:
+            await interaction.response.send_message(
+                f"**{user.display_name}** is already authorized (display name updated).",
+                ephemeral=True,
+            )
+
+    @admin_group.command(
+        name="removeuser", description="Remove a user from the authorized voters list"
+    )
+    @app_commands.describe(user="The Discord user to remove")
+    @is_admin()
+    async def remove_user(self, interaction: discord.Interaction, user: discord.User) -> None:
+        removed = db.remove_authorized_user(user.id)
+        if removed:
+            await interaction.response.send_message(
+                f"**{user.display_name}** has been removed from the authorized voters list.",
+                ephemeral=True,
+            )
+        else:
+            await interaction.response.send_message(
+                f"**{user.display_name}** was not on the authorized list.",
+                ephemeral=True,
+            )
+
+    @admin_group.command(
+        name="users", description="List all authorized voters"
+    )
+    @is_admin()
+    async def list_users(self, interaction: discord.Interaction) -> None:
+        users = db.get_authorized_users()
+        if not users:
+            await interaction.response.send_message(
+                "No authorized users yet. Use `/admin adduser` to add members.",
+                ephemeral=True,
+            )
+            return
+
+        lines = []
+        for u in users:
+            name = u["display_name"] or f"User {u['user_id']}"
+            lines.append(f"- **{name}** (<@{u['user_id']}>)")
+
+        embed = discord.Embed(
+            title="Authorized Voters",
+            description="\n".join(lines),
+            color=discord.Color.blue(),
+        )
+        embed.set_footer(text=f"{len(users)} authorized members")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @admin_group.command(
         name="reminder", description="Manually send reminder DMs to non-voters"
     )
     @is_admin()

@@ -11,6 +11,11 @@ from bot.views.vote_view import start_vote_flow
 
 log = logging.getLogger("demobot.voting")
 
+NOT_AUTHORIZED_MSG = (
+    "You're not on the authorized voters list for MAVV Game Night. "
+    "Ask an admin to add you with `/admin adduser`."
+)
+
 
 class Voting(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
@@ -18,6 +23,10 @@ class Voting(commands.Cog):
 
     @app_commands.command(name="vote", description="Rank this week's games for MAVV Game Night")
     async def vote(self, interaction: discord.Interaction) -> None:
+        if not db.is_authorized(interaction.user.id):
+            await interaction.response.send_message(NOT_AUTHORIZED_MSG, ephemeral=True)
+            return
+
         cycle = db.get_current_cycle()
         if not cycle:
             await interaction.response.send_message(
@@ -45,6 +54,10 @@ class Voting(commands.Cog):
         ]
     )
     async def attend(self, interaction: discord.Interaction, status: str) -> None:
+        if not db.is_authorized(interaction.user.id):
+            await interaction.response.send_message(NOT_AUTHORIZED_MSG, ephemeral=True)
+            return
+
         cycle = db.get_current_cycle()
         if not cycle:
             await interaction.response.send_message(
@@ -74,6 +87,10 @@ class Voting(commands.Cog):
     )
     @app_commands.describe(game="Name of the game you want to nominate")
     async def nominate(self, interaction: discord.Interaction, game: str) -> None:
+        if not db.is_authorized(interaction.user.id):
+            await interaction.response.send_message(NOT_AUTHORIZED_MSG, ephemeral=True)
+            return
+
         config = self.bot.config
         cycle = db.get_current_cycle()
         if not cycle:

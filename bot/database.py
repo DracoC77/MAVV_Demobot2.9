@@ -87,10 +87,74 @@ def init_db() -> None:
             runoff_message_id INTEGER,
             UNIQUE(cycle_id, user_id)
         );
+
+        CREATE TABLE IF NOT EXISTS authorized_users (
+            user_id INTEGER PRIMARY KEY,
+            added_by INTEGER,
+            added_at TEXT NOT NULL DEFAULT (datetime('now')),
+            display_name TEXT
+        );
     """
     )
     conn.commit()
     conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Authorized Users helpers
+# ---------------------------------------------------------------------------
+
+
+def add_authorized_user(user_id: int, added_by: int, display_name: Optional[str] = None) -> bool:
+    """Add a user to the authorized voters list. Returns False if already authorized."""
+    conn = get_connection()
+    try:
+        conn.execute(
+            "INSERT INTO authorized_users (user_id, added_by, display_name) VALUES (?, ?, ?)",
+            (user_id, added_by, display_name),
+        )
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        # Update display name if it changed
+        conn.execute(
+            "UPDATE authorized_users SET display_name = ? WHERE user_id = ?",
+            (display_name, user_id),
+        )
+        conn.commit()
+        return False
+    finally:
+        conn.close()
+
+
+def remove_authorized_user(user_id: int) -> bool:
+    """Remove a user from the authorized voters list."""
+    conn = get_connection()
+    cur = conn.execute("DELETE FROM authorized_users WHERE user_id = ?", (user_id,))
+    conn.commit()
+    removed = cur.rowcount > 0
+    conn.close()
+    return removed
+
+
+def is_authorized(user_id: int) -> bool:
+    """Check if a user is on the authorized voters list."""
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT 1 FROM authorized_users WHERE user_id = ?", (user_id,)
+    ).fetchone()
+    conn.close()
+    return row is not None
+
+
+def get_authorized_users() -> list[sqlite3.Row]:
+    """Get all authorized users."""
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT * FROM authorized_users ORDER BY display_name"
+    ).fetchall()
+    conn.close()
+    return rows
 
 
 # ---------------------------------------------------------------------------

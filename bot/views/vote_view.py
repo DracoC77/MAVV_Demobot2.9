@@ -216,8 +216,18 @@ class AttendancePromptView(discord.ui.View):
         self.stop()
 
 
+NOT_AUTHORIZED_MSG = (
+    "You're not on the authorized voters list for MAVV Game Night. "
+    "Ask an admin to add you with `/admin adduser`."
+)
+
+
 async def start_vote_flow(interaction: discord.Interaction, cycle: dict) -> None:
     """Unified entry point for voting. Prompts attendance if needed, then starts ranking."""
+    if not db.is_authorized(interaction.user.id):
+        await interaction.response.send_message(NOT_AUTHORIZED_MSG, ephemeral=True)
+        return
+
     attendance = db.get_attendance(cycle["id"], interaction.user.id)
 
     if attendance is None:
@@ -293,6 +303,10 @@ class VoteNowButton(discord.ui.View):
     async def attend_no(
         self, interaction: discord.Interaction, button: discord.ui.Button
     ) -> None:
+        if not db.is_authorized(interaction.user.id):
+            await interaction.response.send_message(NOT_AUTHORIZED_MSG, ephemeral=True)
+            return
+
         cycle = db.get_current_cycle()
         if not cycle:
             await interaction.response.send_message(

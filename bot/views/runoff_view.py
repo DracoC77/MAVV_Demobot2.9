@@ -19,6 +19,12 @@ class RunoffButton(discord.ui.Button["RunoffView"]):
         self.game_name = game_name
 
     async def callback(self, interaction: discord.Interaction) -> None:
+        if not db.is_authorized(interaction.user.id):
+            await interaction.response.send_message(
+                "You're not on the authorized voters list.", ephemeral=True
+            )
+            return
+
         view: RunoffView = self.view
         cycle = db.get_current_cycle()
         if not cycle or cycle["status"] != "runoff":

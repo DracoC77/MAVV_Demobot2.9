@@ -13,6 +13,7 @@ Discord bot for managing weekly MAVV Game Night voting. Handles nominations, att
 - **Anonymous voting** — Individual votes are never revealed, only aggregate scores
 - **Reminder DMs** — Auto-reminds attending members who haven't voted yet
 - **Higher = better scoring** — First choice gets max points, averaged across attending voters
+- **Authorized voters list** — Only approved members can vote, nominate, or attend (admin-managed)
 
 ## Quick Start
 
@@ -54,9 +55,10 @@ The bot will start, sync slash commands to your server, and begin the automated 
 
 ### 5. First-Time Setup
 
-1. Run `/admin start` to open the first voting cycle
-2. Run `/admin seed Game1, Game2, Game3, Game4, Game5` to add initial games
-3. Members can now click **Vote Now** on the announcement or use `/vote`
+1. Use `/admin adduser @member` to add each member of your gaming group to the authorized voters list
+2. Run `/admin start` to open the first voting cycle
+3. Run `/admin seed Game1, Game2, Game3, Game4, Game5` to add initial games
+4. Members can now click **Vote Now** on the announcement or use `/vote`
 
 After the first week, the bot handles everything automatically.
 
@@ -96,6 +98,9 @@ After the first week, the bot handles everything automatically.
 |---------|-------------|
 | `/admin start` | Manually start a new voting cycle |
 | `/admin close` | Manually close voting and publish results |
+| `/admin adduser @user` | Add a member to the authorized voters list |
+| `/admin removeuser @user` | Remove a member from the authorized voters list |
+| `/admin users` | List all authorized voters |
 | `/admin addgame <name>` | Add a game to the current ballot |
 | `/admin removegame <name>` | Remove a game from the ballot |
 | `/admin mergegame <from> <into>` | Merge duplicate game names |
