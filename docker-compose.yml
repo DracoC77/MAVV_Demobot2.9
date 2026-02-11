@@ -1,0 +1,10 @@
+services:
+  demobot:
+    build: .
+    container_name: mavv-demobot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    # No ports needed — bot connects outbound to Discord
