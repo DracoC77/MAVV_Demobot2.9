@@ -16,12 +16,15 @@ NOT_AUTHORIZED_MSG = (
     "Ask an admin to add you with `/admin adduser`."
 )
 
+MAX_GAME_NAME_LENGTH = 100
+
 
 class Voting(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
     @app_commands.command(name="vote", description="Rank this week's games for MAVV Game Night")
+    @app_commands.checks.cooldown(1, 30.0)
     async def vote(self, interaction: discord.Interaction) -> None:
         if not db.is_authorized(interaction.user.id):
             await interaction.response.send_message(NOT_AUTHORIZED_MSG, ephemeral=True)
@@ -55,6 +58,7 @@ class Voting(commands.Cog):
     @app_commands.command(
         name="attend", description="Set your attendance for this week's game night"
     )
+    @app_commands.checks.cooldown(1, 15.0)
     @app_commands.describe(status="Are you attending game night this week?")
     @app_commands.choices(
         status=[
@@ -94,6 +98,7 @@ class Voting(commands.Cog):
     @app_commands.command(
         name="nominate", description="Nominate a game for next week's ballot"
     )
+    @app_commands.checks.cooldown(1, 30.0)
     @app_commands.describe(game="Name of the game you want to nominate")
     async def nominate(self, interaction: discord.Interaction, game: str) -> None:
         if not db.is_authorized(interaction.user.id):
@@ -117,6 +122,13 @@ class Voting(commands.Cog):
         if not game_name:
             await interaction.response.send_message(
                 "Please provide a game name.", ephemeral=True
+            )
+            return
+
+        if len(game_name) > MAX_GAME_NAME_LENGTH:
+            await interaction.response.send_message(
+                f"Game name is too long (max {MAX_GAME_NAME_LENGTH} characters).",
+                ephemeral=True,
             )
             return
 
@@ -187,6 +199,18 @@ class Voting(commands.Cog):
 
         embed.set_footer(text=f"Attendance: {att_status} | Cycle #{cycle['id']} ({status_label})")
         await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+    async def cog_app_command_error(
+        self, interaction: discord.Interaction, error: app_commands.AppCommandError
+    ) -> None:
+        if isinstance(error, app_commands.CommandOnCooldown):
+            await interaction.response.send_message(
+                f"Slow down! Try again in {error.retry_after:.0f}s.",
+                ephemeral=True,
+            )
+        else:
+            raise error
 
 
 async def setup(bot: commands.Bot) -> None:
