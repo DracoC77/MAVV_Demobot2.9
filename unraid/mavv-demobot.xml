@@ -204,8 +204,8 @@
     </Variable>
   </Environment>
   <Config Name="Data" Target="/app/data" Default="/mnt/user/appdata/mavv-demobot/data" Mode="rw" Description="Database and persistent data" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/mavv-demobot/data</Config>
-  <Config Name="Discord Token" Target="DISCORD_TOKEN" Default="" Mode="" Description="Discord bot token from https://discord.com/developers/applications" Type="Variable" Display="always-hide" Required="true" Mask="true"/>
-  <Config Name="Discord Guild ID" Target="DISCORD_GUILD_ID" Default="" Mode="" Description="Your Discord server (guild) ID" Type="Variable" Display="always" Required="true" Mask="false"/>
+  <Config Name="Discord Bot Token" Target="DISCORD_TOKEN" Default="" Mode="" Description="Discord bot token from https://discord.com/developers/applications" Type="Variable" Display="always-hide" Required="true" Mask="true"/>
+  <Config Name="Discord Server ID" Target="DISCORD_GUILD_ID" Default="" Mode="" Description="Your Discord server (guild) ID" Type="Variable" Display="always" Required="true" Mask="false"/>
   <Config Name="Vote Channel ID" Target="VOTE_CHANNEL_ID" Default="" Mode="" Description="Channel ID for voting announcements and results" Type="Variable" Display="always" Required="true" Mask="false"/>
   <Config Name="Admin User IDs" Target="ADMIN_USER_IDS" Default="" Mode="" Description="Comma-separated Discord user IDs for bot admins" Type="Variable" Display="always" Required="true" Mask="false"/>
   <Config Name="Vote Open Day" Target="VOTE_OPEN_DAY" Default="tuesday" Mode="" Description="Day of week to open voting" Type="Variable" Display="always" Required="false" Mask="false">tuesday</Config>

@@ -1,8 +1,12 @@
 """Runoff voting view — single pick among tied games."""
 
+import logging
+
 import discord
 
 from bot import database as db
+
+log = logging.getLogger("demobot.runoff")
 
 
 class RunoffButton(discord.ui.Button["RunoffView"]):
@@ -49,6 +53,23 @@ class RunoffButton(discord.ui.Button["RunoffView"]):
             f"You can click again to change your pick before the runoff ends.",
             ephemeral=True,
         )
+
+        # Auto-resolve if all attending members have voted
+        attending = set(db.get_attending_users(cycle["id"]))
+        runoff_voters = set(db.get_runoff_voters(cycle["id"]))
+        if attending and attending.issubset(runoff_voters):
+            log.info(
+                f"All {len(attending)} attending members have voted in runoff for "
+                f"cycle #{cycle['id']}. Auto-resolving."
+            )
+            from bot.cogs.results import resolve_runoff
+
+            bot = interaction.client
+            config = bot.config
+            channel = bot.get_channel(config.vote_channel_id)
+            if channel:
+                full_results = db.calculate_results(cycle["id"])
+                await resolve_runoff(bot, cycle["id"], full_results, channel)
 
 
 class RunoffView(discord.ui.View):

@@ -94,6 +94,14 @@ def init_db() -> None:
             added_at TEXT NOT NULL DEFAULT (datetime('now')),
             display_name TEXT
         );
+
+        CREATE TABLE IF NOT EXISTS pending_nominations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            game_id INTEGER NOT NULL REFERENCES games(id),
+            nominated_by INTEGER NOT NULL,
+            nominated_at TEXT NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(game_id)
+        );
     """
     )
     conn.commit()
@@ -304,6 +312,13 @@ def merge_games(from_name: str, into_name: str) -> bool:
         "UPDATE OR IGNORE runoff_votes SET game_id = ? WHERE game_id = ?", (into_id, from_id)
     )
     conn.execute("DELETE FROM runoff_votes WHERE game_id = ?", (from_id,))
+
+    # Update pending_nominations
+    conn.execute(
+        "UPDATE OR IGNORE pending_nominations SET game_id = ? WHERE game_id = ?",
+        (into_id, from_id),
+    )
+    conn.execute("DELETE FROM pending_nominations WHERE game_id = ?", (from_id,))
 
     # Update winning references
     conn.execute(
@@ -516,6 +531,16 @@ def save_runoff_vote(cycle_id: int, user_id: int, game_id: int, message_id: int 
     conn.close()
 
 
+def get_runoff_voters(cycle_id: int) -> list[int]:
+    """Get all user IDs that have cast a runoff vote for a cycle."""
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT DISTINCT user_id FROM runoff_votes WHERE cycle_id = ?", (cycle_id,)
+    ).fetchall()
+    conn.close()
+    return [r["user_id"] for r in rows]
+
+
 def get_runoff_results(cycle_id: int) -> list[dict]:
     """Count runoff votes per game among attending users."""
     attending = get_attending_users(cycle_id)
@@ -533,6 +558,86 @@ def get_runoff_results(cycle_id: int) -> list[dict]:
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+# ---------------------------------------------------------------------------
+# Pending Nominations helpers
+# ---------------------------------------------------------------------------
+
+
+def add_pending_nomination(game_id: int, nominated_by: int) -> bool:
+    """Add a game to the pending nominations pool. Returns False if already pending."""
+    conn = get_connection()
+    try:
+        conn.execute(
+            "INSERT INTO pending_nominations (game_id, nominated_by) VALUES (?, ?)",
+            (game_id, nominated_by),
+        )
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+    finally:
+        conn.close()
+
+
+def get_pending_nominations() -> list[sqlite3.Row]:
+    """Get all pending nominations with game names."""
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT pn.*, g.name AS game_name FROM pending_nominations pn "
+        "JOIN games g ON g.id = pn.game_id ORDER BY pn.nominated_at",
+    ).fetchall()
+    conn.close()
+    return rows
+
+
+def get_pending_nomination_count_for_user(user_id: int) -> int:
+    """Count how many pending nominations a user has."""
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT COUNT(*) AS cnt FROM pending_nominations WHERE nominated_by = ?",
+        (user_id,),
+    ).fetchone()
+    conn.close()
+    return row["cnt"]
+
+
+def get_pending_nomination_count() -> int:
+    """Total number of pending nominations."""
+    conn = get_connection()
+    row = conn.execute("SELECT COUNT(*) AS cnt FROM pending_nominations").fetchone()
+    conn.close()
+    return row["cnt"]
+
+
+def absorb_pending_nominations(cycle_id: int, max_slots: int) -> int:
+    """Move pending nominations into a cycle (up to max_slots). Returns count added."""
+    conn = get_connection()
+    pending = conn.execute(
+        "SELECT * FROM pending_nominations ORDER BY nominated_at"
+    ).fetchall()
+
+    added = 0
+    for row in pending:
+        if added >= max_slots:
+            break
+        try:
+            conn.execute(
+                "INSERT INTO cycle_games (cycle_id, game_id, is_carry_over, nominated_by) "
+                "VALUES (?, ?, 0, ?)",
+                (cycle_id, row["game_id"], row["nominated_by"]),
+            )
+            added += 1
+        except sqlite3.IntegrityError:
+            # Game already on cycle (e.g. was a carry-over)
+            pass
+
+    # Clear all absorbed nominations
+    conn.execute("DELETE FROM pending_nominations")
+    conn.commit()
+    conn.close()
+    return added
 
 
 # ---------------------------------------------------------------------------
