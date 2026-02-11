@@ -45,7 +45,7 @@ async def publish_results(bot: commands.Bot, cycle_id: int) -> None:
         winner = results[0]
         db.close_cycle(cycle_id)
         db.publish_cycle(cycle_id, winner["game_id"])
-        embed = build_results_embed(cycle_id, results, winner)
+        embed = build_results_embed(cycle_id, results, winner, config.carry_over_count)
         await channel.send(embed=embed)
         log.info(f"Cycle #{cycle_id} results published. Winner: {winner['game_name']}")
 
@@ -163,7 +163,8 @@ async def resolve_runoff(
     db.close_cycle(cycle_id)
     db.publish_cycle(cycle_id, winner["game_id"])
 
-    embed = build_results_embed(cycle_id, full_results, winner)
+    config = bot.config
+    embed = build_results_embed(cycle_id, full_results, winner, config.carry_over_count)
     if note:
         embed.add_field(name="Note", value=note, inline=False)
 
@@ -180,7 +181,7 @@ async def resolve_runoff(
 
 
 def build_results_embed(
-    cycle_id: int, results: list[dict], winner: dict
+    cycle_id: int, results: list[dict], winner: dict, carry_over_count: int = 5
 ) -> discord.Embed:
     """Build the results announcement embed."""
     embed = discord.Embed(
@@ -192,6 +193,13 @@ def build_results_embed(
         value=f"**{winner['game_name']}**",
         inline=False,
     )
+
+    # Figure out the carry-over cutoff, expanding for ties at the boundary
+    cutoff = min(carry_over_count, len(results))
+    if cutoff > 0 and cutoff < len(results):
+        boundary_score = results[cutoff - 1]["avg_score"]
+        while cutoff < len(results) and abs(results[cutoff]["avg_score"] - boundary_score) < 0.0001:
+            cutoff += 1
 
     ranking_lines = []
     for i, r in enumerate(results):
@@ -208,6 +216,9 @@ def build_results_embed(
         ranking_lines.append(
             f"{medal}**{i+1}.** {r['game_name']} — avg score: {avg:.2f} ({votes} votes)"
         )
+
+        if i == cutoff - 1 and cutoff < len(results):
+            ranking_lines.append("─── *returning next week* ───")
 
     embed.add_field(
         name="Full Rankings",
@@ -253,7 +264,7 @@ class Results(commands.Cog):
             {"game_id": cycle["winning_game_id"], "game_name": game["name"] if game else "Unknown", "avg_score": 0, "vote_count": 0},
         )
 
-        embed = build_results_embed(cycle["id"], results_data, winner)
+        embed = build_results_embed(cycle["id"], results_data, winner, self.bot.config.carry_over_count)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(
