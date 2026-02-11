@@ -1,0 +1,177 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>mavv-demobot</Name>
+  <Repository>mavv-demobot</Repository>
+  <Registry/>
+  <Network>bridge</Network>
+  <Shell>bash</Shell>
+  <Privileged>false</Privileged>
+  <Support/>
+  <Overview>MAVV Demobot 2.9 — Discord Game Night Voting Bot. Manages weekly game voting, nominations, attendance, and result publishing for your gaming group.</Overview>
+  <Category>Tools:</Category>
+  <Icon>/mnt/user/appdata/mavv-demobot/icon.png</Icon>
+  <TemplateURL/>
+  <Networking>
+    <Mode>bridge</Mode>
+  </Networking>
+  <Data>
+    <Volume>
+      <HostDir>/mnt/user/appdata/mavv-demobot/data</HostDir>
+      <ContainerDir>/app/data</ContainerDir>
+      <Mode>rw</Mode>
+    </Volume>
+  </Data>
+  <Environment>
+    <Variable>
+      <Value></Value>
+      <Name>DISCORD_TOKEN</Name>
+      <Mode/>
+      <Description>Discord bot token from https://discord.com/developers/applications</Description>
+      <Default/>
+      <Display>always-hide</Display>
+      <Required>true</Required>
+      <Mask>true</Mask>
+    </Variable>
+    <Variable>
+      <Value></Value>
+      <Name>DISCORD_GUILD_ID</Name>
+      <Mode/>
+      <Description>Your Discord server (guild) ID</Description>
+      <Default/>
+      <Display>always</Display>
+      <Required>true</Required>
+      <Mask>false</Mask>
+    </Variable>
+    <Variable>
+      <Value></Value>
+      <Name>VOTE_CHANNEL_ID</Name>
+      <Mode/>
+      <Description>Channel ID for voting announcements and results</Description>
+      <Default/>
+      <Display>always</Display>
+      <Required>true</Required>
+      <Mask>false</Mask>
+    </Variable>
+    <Variable>
+      <Value></Value>
+      <Name>ADMIN_USER_IDS</Name>
+      <Mode/>
+      <Description>Comma-separated Discord user IDs for bot admins</Description>
+      <Default/>
+      <Display>always</Display>
+      <Required>true</Required>
+      <Mask>false</Mask>
+    </Variable>
+    <Variable>
+      <Value>tuesday</Value>
+      <Name>VOTE_OPEN_DAY</Name>
+      <Mode/>
+      <Description>Day of week to open voting</Description>
+      <Default>tuesday</Default>
+      <Display>always</Display>
+      <Required>false</Required>
+      <Mask>false</Mask>
+    </Variable>
+    <Variable>
+      <Value>09:00</Value>
+      <Name>VOTE_OPEN_TIME</Name>
+      <Mode/>
+      <Description>Time to open voting (HH:MM in configured timezone)</Description>
+      <Default>09:00</Default>
+      <Display>always</Display>
+      <Required>false</Required>
+      <Mask>false</Mask>
+    </Variable>
+    <Variable>
+      <Value>friday</Value>
+      <Name>RESULTS_DAY</Name>
+      <Mode/>
+      <Description>Day of week to publish results</Description>
+      <Default>friday</Default>
+      <Display>always</Display>
+      <Required>false</Required>
+      <Mask>false</Mask>
+    </Variable>
+    <Variable>
+      <Value>09:00</Value>
+      <Name>RESULTS_TIME</Name>
+      <Mode/>
+      <Description>Time to publish results (HH:MM in configured timezone)</Description>
+      <Default>09:00</Default>
+      <Display>always</Display>
+      <Required>false</Required>
+      <Mask>false</Mask>
+    </Variable>
+    <Variable>
+      <Value>thursday</Value>
+      <Name>REMINDER_DAY</Name>
+      <Mode/>
+      <Description>Day of week to send reminder DMs</Description>
+      <Default>thursday</Default>
+      <Display>always</Display>
+      <Required>false</Required>
+      <Mask>false</Mask>
+    </Variable>
+    <Variable>
+      <Value>18:00</Value>
+      <Name>REMINDER_TIME</Name>
+      <Mode/>
+      <Description>Time to send reminders (HH:MM in configured timezone)</Description>
+      <Default>18:00</Default>
+      <Display>always</Display>
+      <Required>false</Required>
+      <Mask>false</Mask>
+    </Variable>
+    <Variable>
+      <Value>America/Los_Angeles</Value>
+      <Name>TIMEZONE</Name>
+      <Mode/>
+      <Description>IANA timezone for all scheduled events</Description>
+      <Default>America/Los_Angeles</Default>
+      <Display>always</Display>
+      <Required>false</Required>
+      <Mask>false</Mask>
+    </Variable>
+    <Variable>
+      <Value>120</Value>
+      <Name>RUNOFF_DURATION_MINUTES</Name>
+      <Mode/>
+      <Description>Duration of runoff vote in minutes</Description>
+      <Default>120</Default>
+      <Display>always</Display>
+      <Required>false</Required>
+      <Mask>false</Mask>
+    </Variable>
+    <Variable>
+      <Value>1</Value>
+      <Name>MAX_NOMINATIONS_PER_PERSON</Name>
+      <Mode/>
+      <Description>Max game nominations per person per week</Description>
+      <Default>1</Default>
+      <Display>always</Display>
+      <Required>false</Required>
+      <Mask>false</Mask>
+    </Variable>
+    <Variable>
+      <Value>10</Value>
+      <Name>MAX_TOTAL_GAMES</Name>
+      <Mode/>
+      <Description>Max games on the ballot per week</Description>
+      <Default>10</Default>
+      <Display>always</Display>
+      <Required>false</Required>
+      <Mask>false</Mask>
+    </Variable>
+    <Variable>
+      <Value>5</Value>
+      <Name>CARRY_OVER_COUNT</Name>
+      <Mode/>
+      <Description>Number of top games that carry over each week</Description>
+      <Default>5</Default>
+      <Display>always</Display>
+      <Required>false</Required>
+      <Mask>false</Mask>
+    </Variable>
+  </Environment>
+  <Config Name="Data" Target="/app/data" Default="/mnt/user/appdata/mavv-demobot/data" Mode="rw" Description="Database and persistent data" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/mavv-demobot/data</Config>
+</Container>
