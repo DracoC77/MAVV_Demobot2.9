@@ -218,7 +218,7 @@ def build_results_embed(
         )
 
         if i == cutoff - 1 and cutoff < len(results):
-            ranking_lines.append("─── *returning next week* ───")
+            ranking_lines.append("─── *dropping games below* ───")
 
     embed.add_field(
         name="Full Rankings",

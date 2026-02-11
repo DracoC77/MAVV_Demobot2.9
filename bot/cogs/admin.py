@@ -330,10 +330,9 @@ class Admin(commands.Cog):
 
         await interaction.response.defer(ephemeral=True)
 
-        attending = db.get_attending_users(cycle["id"])
-
         if cycle["status"] == "runoff":
-            # Remind attending members who haven't voted in the runoff
+            # Runoff: only poke attending members who haven't cast a runoff vote
+            attending = db.get_attending_users(cycle["id"])
             runoff_voters = set(db.get_runoff_voters(cycle["id"]))
             non_voters = [uid for uid in attending if uid not in runoff_voters]
             dm_text = (
@@ -342,8 +341,19 @@ class Admin(commands.Cog):
                 f"tie-breaker vote before the deadline."
             )
         else:
+            # Open: poke all authorized users who haven't voted, except
+            # those who explicitly said not attending
+            all_users = [u["user_id"] for u in db.get_authorized_users()]
+            declined = {
+                a["user_id"]
+                for a in db.get_all_attendance(cycle["id"])
+                if not a["attending"]
+            }
             voters = db.get_voters(cycle["id"])
-            non_voters = [uid for uid in attending if uid not in voters]
+            non_voters = [
+                uid for uid in all_users
+                if uid not in voters and uid not in declined
+            ]
             dm_text = (
                 f"Reminder: You haven't submitted your game night vote yet! "
                 f"Head to <#{self.bot.config.vote_channel_id}> and use `/vote` "

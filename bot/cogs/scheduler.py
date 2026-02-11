@@ -229,9 +229,9 @@ class Scheduler(commands.Cog):
             log.info("No active cycle for reminders.")
             return
 
-        attending = db.get_attending_users(cycle["id"])
-
         if cycle["status"] == "runoff":
+            # Runoff: only poke attending members
+            attending = db.get_attending_users(cycle["id"])
             runoff_voters = set(db.get_runoff_voters(cycle["id"]))
             non_voters = [uid for uid in attending if uid not in runoff_voters]
             dm_text = (
@@ -240,8 +240,19 @@ class Scheduler(commands.Cog):
                 f"before the deadline!"
             )
         else:
+            # Open: poke all authorized users who haven't voted, except
+            # those who explicitly said not attending
+            all_users = [u["user_id"] for u in db.get_authorized_users()]
+            declined = {
+                a["user_id"]
+                for a in db.get_all_attendance(cycle["id"])
+                if not a["attending"]
+            }
             voters = db.get_voters(cycle["id"])
-            non_voters = [uid for uid in attending if uid not in voters]
+            non_voters = [
+                uid for uid in all_users
+                if uid not in voters and uid not in declined
+            ]
             dm_text = (
                 f"Hey! Friendly reminder that you haven't submitted your MAVV Game Night "
                 f"vote yet. Head to <#{config.vote_channel_id}> and click **Vote Now** "
